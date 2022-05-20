@@ -1,0 +1,50 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// :copyright: matevisky
+
+//@version=5
+indicator("Mergo v1", overlay=true)
+// indicator("Mergo v1")
+
+var lookback = 5
+var lookback_kc = 15
+var lookback_kc2 = 5
+
+// KELTNER
+[kc_middle, kc_upper, kc_lower] = ta.kc(close, 20, 2.25)
+plot(kc_middle, color=color.new(color.gray, 20))
+plot(kc_upper, color=color.new(color.gray, 20))
+plot(kc_lower, color=color.new(color.gray, 20))
+
+// MACD
+fastMA = ta.sma(close, 3)
+slowMA = ta.sma(close, 10)
+macd = fastMA - slowMA
+signal = ta.sma(macd, 16)
+
+
+buy_signal = open < close
+buy_trigger_kc = false
+sell_signal = open > close
+sell_trigger_kc = false
+for offset = 0 to lookback
+    buy_signal := buy_signal and low[offset] > kc_lower[offset]
+    buy_trigger_kc := buy_trigger_kc or kc_middle[offset] > low[offset]
+    sell_signal := sell_signal and high[offset] < kc_upper[offset]
+    sell_trigger_kc := sell_trigger_kc or kc_middle[offset] < high[offset]
+
+buy_signal := buy_signal and macd < signal
+buy_signal := buy_signal and buy_trigger_kc
+buy_signal := buy_signal and macd[1] < macd[0] and (macd[2] > macd[1] or macd[3] > macd[2]  or macd[4] > macd[3])
+buy_signal := buy_signal and ta.highest(high, lookback_kc) > kc_upper[lookback_kc]
+buy_signal := buy_signal and ta.highest(high, lookback_kc2) > kc_middle[lookback_kc2]
+buy_signal := buy_signal and not buy_signal[1] and not buy_signal[2] and not buy_signal[3]
+sell_signal := sell_signal and macd > signal
+sell_signal := sell_signal and sell_trigger_kc
+sell_signal := sell_signal and macd[1] > macd[0] and (macd[2] < macd[1] or macd[3] < macd[2]  or macd[4] < macd[3])
+sell_signal := sell_signal and ta.lowest(low, lookback_kc) < kc_lower[lookback_kc]
+sell_signal := sell_signal and ta.lowest(low, lookback_kc2) < kc_middle[lookback_kc2]
+sell_signal := sell_signal and not sell_signal[1] and not sell_signal[2] and not sell_signal[3]
+
+
+plotshape(sell_signal, style=shape.triangledown, color=color.red, location=location.abovebar)
+plotshape(buy_signal, style=shape.triangleup, color=color.green, location=location.belowbar)
