@@ -1,0 +1,77 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © matevisky
+
+//@version=5
+indicator("Risk calculator", overlay=true)
+// indicator("Risk calculator")
+
+var trigger_time                = input.time(timestamp("01 Nov 2022 00:00"), "Trigger time")
+var sl                          = input.price(title="SL", defval = 0, confirm = true)
+var entry_buffer_percent        = input.int(10, "Entry buffer percent", minval=0, maxval=100, step=1)
+var balance                     = input.float(50000, "Balance")
+var risk_percent                = input.float(0.5, "Risk percent", minval=0, maxval=100, step=0.01)
+
+var float risk_value            = 0
+var float entry                 = 0
+var int direction               = 0
+var float tp                    = 0
+var int size                    = 0
+var color_entry = color.gray
+var color_sl    = color.red
+var color_tp    = color.green
+
+
+_barForTime(_t) =>
+    var int _bar = 0
+    if time > _t
+        _bar := _bar + 1
+    _bar
+
+
+bgcolor(time[1] < trigger_time and trigger_time <= time  ? color.new(color.yellow,80) : na)
+
+trigger_bar                     = _barForTime(trigger_time)
+int line_size                   = trigger_bar
+
+// display data
+var table atrDisplay = table.new(position.top_center, 4, 2, bgcolor = color.new(color.black, 100), frame_width = 1, frame_color = color.white)
+if barstate.islast
+    if sl > close[trigger_bar]
+        direction := -1
+        entry := high[trigger_bar] - (high[trigger_bar] - low[trigger_bar]) * (100 - entry_buffer_percent) / 100
+        risk_value := sl - entry
+        tp := entry - risk_value
+    
+    if sl < close[trigger_bar]
+        direction := 1
+        entry := low[trigger_bar] + (high[trigger_bar] - low[trigger_bar]) * (100 - entry_buffer_percent) / 100
+        risk_value := entry - sl
+        tp := entry + risk_value
+    
+    size := math.round(balance * risk_percent / 100 / risk_value)
+    
+    
+    dt = time - time[1]
+    line.new(time - line_size * dt, entry, time + dt * 5, entry,  xloc = xloc.bar_time, width = 2, color = color_entry)
+    line.new(time - line_size * dt, tp,    time + dt * 5, tp,     xloc = xloc.bar_time, width = 2, color = color_tp)
+    line.new(time - line_size * dt, sl,    time + dt * 5, sl,     xloc = xloc.bar_time, width = 2, color = color_sl)
+
+    size := math.round(size)
+    sl := math.round(sl * 100) / 100
+    entry := math.round(entry * 100) / 100
+    tp := math.round(tp * 100) / 100
+    table.cell(atrDisplay, 0, 0, "Size", text_color = color.white)
+    table.cell(atrDisplay, 1, 0, "Entry", text_color = color.white)
+    table.cell(atrDisplay, 2, 0, "SL", text_color = color.white)
+    table.cell(atrDisplay, 3, 0, "TP", text_color = color.white)
+    table.cell(atrDisplay, 0, 1, str.tostring(size), text_color = color.white)
+    table.cell(atrDisplay, 1, 1, str.tostring(entry), text_color = color_entry)
+    table.cell(atrDisplay, 2, 1, str.tostring(sl), text_color = color_sl)
+    table.cell(atrDisplay, 3, 1, str.tostring(tp), text_color = color_tp)
+    
+
+
+
+
+
+
