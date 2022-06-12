@@ -1,0 +1,141 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © matevisky
+
+//@version=5
+indicator("Mergo Turtle", overlay=true)
+
+getalertmessage(action, entry, stop, profit) => 
+    var message = array.new_string()
+    
+    array.push(message, '"action": "' + action + '"')
+    array.push(message, '"ticker": "' + syminfo.ticker + '"')
+    array.push(message, '"entry": "' + str.tostring(entry) + '"')
+    array.push(message, '"stop": "' + str.tostring(stop) + '"')
+    array.push(message, '"profit": "' + str.tostring(profit) + '"')
+    array.push(message, '"private_key": "1325asawersaf45erdzf1sdf1f2r234@@#"')
+    var result = "{" + array.join(message, ", ") + "}"
+    result
+
+gettestmessage() =>
+    getalertmessage("BUY", 100.12, 50.12, 200.12)
+
+// (0.2, 8)
+var float risk = 100
+var periodbreakout = 28
+var periodstop = 14
+var filter = true
+
+breakouthigh = ta.highest(high, periodbreakout)
+breakoutlow = ta.lowest(low, periodbreakout)
+stophigh = ta.highest(high, periodstop)
+stoplow = ta.lowest(low, periodstop)
+
+plot(breakouthigh, "breakouthigh", color.blue, 2)
+plot(breakoutlow, "breakoutlow", color.blue, 2)
+plot(stophigh, "breakouthigh", color.gray, 2)
+plot(stoplow, "breakoutlow", color.gray, 2)
+
+
+
+
+// balance calculation
+var win = 0
+var loss = 0
+var win_profit = 0
+var loss_profit = 0
+var float stat_entry_price = na
+var float stat_stop_loss = na
+var float stat_stop_loss_original = na
+var float balance = 0
+var int direction = 0
+var int intrade = 0
+var int days = 0
+var bool lastwaswin = na
+
+float plot_stop_loss = na
+float plot_take_profit = na
+
+buy_signal = breakouthigh > breakouthigh[1]
+sell_signal = breakoutlow < breakoutlow[1]
+plotshape(sell_signal, style=shape.triangledown, color=color.red, location=location.abovebar)
+plotshape(buy_signal, style=shape.triangleup, color=color.green, location=location.belowbar)
+
+
+if (direction == 1)
+    if (stat_stop_loss > low)
+        profit = math.round((stat_entry_price - stat_stop_loss) / (stat_entry_price - stat_stop_loss_original) * risk * -1)
+        if (lastwaswin == false or not filter)
+            balance := balance + profit
+            if (profit > 0)
+                win := win + 1
+                win_profit := win_profit + profit
+            else
+                loss := loss + 1
+                loss_profit := loss_profit - profit
+            label.new(x=bar_index, y=low, text=str.tostring(profit), color=profit>0?color.green:color.red, style=label.style_label_up)
+
+        intrade := 0
+        lastwaswin := profit > 0
+        direction := na
+
+if (direction == -1)
+    if (stat_stop_loss < high)
+        profit = math.round((stat_entry_price - stat_stop_loss) / (stat_entry_price - stat_stop_loss_original) * risk * -1)
+        if (lastwaswin == false or not filter)
+            balance := balance + profit
+            if (profit > 0)
+                win := win + 1
+                win_profit := win_profit + profit
+            else
+                loss := loss + 1
+                loss_profit := loss_profit - profit
+            label.new(x=bar_index, y=high, text=str.tostring(profit), color=profit>0?color.green:color.red, style=label.style_label_down)
+
+        lastwaswin := profit > 0
+        direction := na
+        intrade := 0
+
+if (not direction and buy_signal)
+    direction := 1
+    intrade := 1
+    stat_entry_price := breakouthigh[1]
+    // stat_entry_price := close
+    stat_stop_loss := stoplow
+    stat_stop_loss_original := stoplow
+    // alert(getalertmessage("BUY", stat_entry_price, stat_stop_loss, stat_take_profit), alert.freq_once_per_bar_close)
+
+if (not direction and sell_signal)
+    direction := -1
+    intrade := -1
+    stat_entry_price := breakoutlow[1]
+    // stat_entry_price := close
+    stat_stop_loss := stophigh
+    stat_stop_loss_original := stophigh
+    // alert(getalertmessage("SELL", stat_entry_price, stat_stop_loss, stat_take_profit), alert.freq_once_per_bar_close)
+    
+if (direction == 1)
+    stat_stop_loss := stoplow
+if (direction == -1)
+    stat_stop_loss := stophigh
+
+
+
+if (direction)
+    plot_stop_loss := stat_stop_loss
+    days := days + 1
+else
+    plot_stop_loss := na
+
+plot(plot_stop_loss, color=color.new(color.red, 20), style=plot.style_cross, join=false)
+
+// display data
+var table atrDisplay = table.new(position.top_center, 3, 2, bgcolor = color.gray, frame_width = 4, frame_color = color.black)
+if barstate.islast
+    table.cell(atrDisplay, 0, 0, str.tostring(win), text_color = color.white)
+    table.cell(atrDisplay, 1, 0, str.tostring(loss), text_color = color.white)
+    table.cell(atrDisplay, 2, 0, str.tostring(math.round(days / (win + loss) * 10)/10), text_color = color.white)
+    table.cell(atrDisplay, 0, 1, str.tostring(balance), text_color = color.white)
+    table.cell(atrDisplay, 1, 1, str.tostring(win+loss), text_color = color.white)
+    table.cell(atrDisplay, 2, 1, str.tostring(win_profit/loss_profit), text_color = color.white)
+    
+// alert(gettestmessage(), alert.freq_once_per_bar_close)
